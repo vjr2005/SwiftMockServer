@@ -217,6 +217,26 @@ public actor MockServer {
         return stub(method, path, response: response)
     }
 
+    /// Register a static image response loaded from a fixture file.
+    ///
+    /// ```swift
+    /// try await server.stubImage(.GET, "/avatar.png",
+    ///     named: "avatar.png", in: .module)
+    /// ```
+    @discardableResult
+    public func stubImage(
+        _ method: HTTPMethod? = nil,
+        _ path: String,
+        named filename: String,
+        in bundle: Bundle,
+        status: HTTPStatus = .ok
+    ) throws -> String {
+        guard let response = MockHTTPResponse.imageFile(named: filename, in: bundle, status: status) else {
+            throw MockServerError.invalidRequest("Image fixture not found: \(filename)")
+        }
+        return stub(method, path, response: response)
+    }
+
     // MARK: - Route Management
 
     /// Remove a route by its ID.

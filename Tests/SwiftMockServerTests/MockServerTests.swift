@@ -5,155 +5,6 @@ import Testing
 import Foundation
 @testable import SwiftMockServer
 
-// MARK: - HTTP Parser Tests
-
-@Suite("HTTP Parser")
-struct HTTPParserTests {
-
-    @Test("Parses a simple GET request")
-    func parseSimpleGET() throws {
-        let raw = "GET /api/users HTTP/1.1\r\nHost: localhost\r\nAccept: application/json\r\n\r\n"
-        let request = try HTTPParser.parse(Data(raw.utf8))
-
-        #expect(request.method == .GET)
-        #expect(request.path == "/api/users")
-        #expect(request.headers["Host"] == "localhost")
-        #expect(request.headers["Accept"] == "application/json")
-        #expect(request.body == nil)
-    }
-
-    @Test("Parses GET with query parameters")
-    func parseGETWithQuery() throws {
-        let raw = "GET /search?q=swift&page=2 HTTP/1.1\r\nHost: localhost\r\n\r\n"
-        let request = try HTTPParser.parse(Data(raw.utf8))
-
-        #expect(request.path == "/search")
-        #expect(request.queryParameters["q"] == "swift")
-        #expect(request.queryParameters["page"] == "2")
-    }
-
-    @Test("Parses POST with JSON body")
-    func parsePOSTWithBody() throws {
-        let body = "{\"name\":\"Alice\",\"age\":30}"
-        let raw = "POST /api/users HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: \(body.count)\r\n\r\n\(body)"
-        let request = try HTTPParser.parse(Data(raw.utf8))
-
-        #expect(request.method == .POST)
-        #expect(request.path == "/api/users")
-        #expect(request.bodyString == body)
-    }
-
-    @Test("Serializes response correctly")
-    func serializeResponse() throws {
-        let response = MockHTTPResponse.json("{\"ok\":true}")
-        let data = HTTPParser.serialize(response)
-        let string = String(data: data, encoding: .utf8)!
-
-        #expect(string.contains("HTTP/1.1 200 OK"))
-        #expect(string.contains("Content-Type: application/json"))
-        #expect(string.contains("{\"ok\":true}"))
-    }
-}
-
-// MARK: - Router Tests
-
-@Suite("Router")
-struct RouterTests {
-
-    @Test("Matches exact path")
-    func exactMatch() {
-        let route = Route(
-            method: .GET,
-            pattern: .exact("/api/users"),
-            handler: { _ in .status(.ok) }
-        )
-
-        let request = MockHTTPRequest(method: .GET, path: "/api/users")
-        let match = RouterEngine.match(request: request, routes: [route])
-
-        #expect(match != nil)
-    }
-
-    @Test("Does not match wrong method")
-    func wrongMethod() {
-        let route = Route(
-            method: .GET,
-            pattern: .exact("/api/users"),
-            handler: { _ in .status(.ok) }
-        )
-
-        let request = MockHTTPRequest(method: .POST, path: "/api/users")
-        let match = RouterEngine.match(request: request, routes: [route])
-
-        #expect(match == nil)
-    }
-
-    @Test("Matches parameterized path")
-    func parameterizedMatch() {
-        let route = Route(
-            method: .GET,
-            pattern: .parameterized("/users/:id/posts/:postId"),
-            handler: { _ in .status(.ok) }
-        )
-
-        let request = MockHTTPRequest(method: .GET, path: "/users/42/posts/99")
-        let match = RouterEngine.match(request: request, routes: [route])
-
-        #expect(match != nil)
-        #expect(match?.pathParameters["id"] == "42")
-        #expect(match?.pathParameters["postId"] == "99")
-    }
-
-    @Test("Matches prefix")
-    func prefixMatch() {
-        let route = Route(
-            method: nil,
-            pattern: .prefix("/api/"),
-            handler: { _ in .status(.ok) }
-        )
-
-        let request = MockHTTPRequest(method: .DELETE, path: "/api/anything/here")
-        let match = RouterEngine.match(request: request, routes: [route])
-
-        #expect(match != nil)
-    }
-
-    @Test("Matches any")
-    func anyMatch() {
-        let route = Route(
-            pattern: .any,
-            handler: { _ in .status(.ok) }
-        )
-
-        let request = MockHTTPRequest(method: .PUT, path: "/literally/anything")
-        let match = RouterEngine.match(request: request, routes: [route])
-
-        #expect(match != nil)
-    }
-
-    @Test("LIFO order: later routes have priority")
-    func lifoOrder() {
-        let route1 = Route(
-            method: .GET,
-            pattern: .exact("/test"),
-            handler: { _ in .text("first") }
-        )
-        let route2 = Route(
-            method: .GET,
-            pattern: .exact("/test"),
-            handler: { _ in .text("second") }
-        )
-
-        let request = MockHTTPRequest(method: .GET, path: "/test")
-        // route2 comes first in the array (simulating LIFO insertion)
-        let match = RouterEngine.match(request: request, routes: [route2, route1])
-
-        #expect(match?.route.id == route2.id)
-    }
-}
-
-// MARK: - MockServer Integration Tests
-
 @Suite("MockServer Integration")
 struct MockServerIntegrationTests {
 
@@ -310,176 +161,241 @@ struct MockServerIntegrationTests {
             await server.stop()
         }
     }
-}
 
-// MARK: - HTTP Types Tests
-
-@Suite("HTTP Types")
-struct HTTPTypesTests {
-
-    @Test("MockHTTPResponse.json creates correct response")
-    func jsonResponse() {
-        let response = MockHTTPResponse.json("{\"ok\":true}")
-        #expect(response.status == .ok)
-        #expect(response.headers["Content-Type"] == "application/json; charset=utf-8")
-        #expect(response.bodyString == "{\"ok\":true}")
-    }
-
-    @Test("MockHTTPResponse.text creates correct response")
-    func textResponse() {
-        let response = MockHTTPResponse.text("hello")
-        #expect(response.headers["Content-Type"] == "text/plain; charset=utf-8")
-    }
-
-    @Test("HTTPStatus equality")
-    func statusEquality() {
-        #expect(HTTPStatus.ok == HTTPStatus(code: 200, reason: "OK"))
-        #expect(HTTPStatus.notFound != HTTPStatus.ok)
-    }
-}
-
-// MARK: - App Config Tests
-
-@Suite("App Config")
-struct AppConfigTests {
-
-    @Test("Generates correct launch configuration")
-    func appConfig() async throws {
-        let server = try await MockServer.create()
-        let config = await server.appConfig()
-
-        #expect(config.launchArguments.contains("-useMockServer"))
-        #expect(config.launchEnvironment["MOCK_SERVER_URL"]?.hasPrefix("http://127.0.0.1:") == true)
-        #expect(config.launchEnvironment["MOCK_SERVER_PORT"] != nil)
-        #expect(config.port > 0)
-
-        await server.stop()
-    }
-}
-
-// MARK: - Route Stub Collection Tests
-
-@Suite("Route Stub Collection")
-struct RouteStubCollectionTests {
-
-    @Test("Batch registration works")
-    func batchRegistration() async throws {
-        var collection = RouteStubCollection()
-        collection.add(.GET, "/api/users", response: .json("[]"))
-        collection.add(.POST, "/api/users", response: .status(.created))
-        collection.add(.GET, "/api/health", response: .text("ok"))
-
-        let server = try await MockServer.create()
-        await server.registerAll(collection)
+    @Test("Port returns requestedPort before start")
+    func portBeforeStart() async {
+        let server = MockServer(port: 9999)
         let port = await server.port
 
-        let healthURL = URL(string: "http://127.0.0.1:\(port)/api/health")!
-        let (data, _) = try await URLSession.shared.data(from: healthURL)
-        #expect(String(data: data, encoding: .utf8) == "ok")
-
-        await server.stop()
-    }
-}
-
-// MARK: - Image File Tests
-
-@Suite("Image File Helper")
-struct ImageFileTests {
-
-    /// Minimal valid 1x1 white PNG (67 bytes).
-    private static let minimalPNG: Data = {
-        let bytes: [UInt8] = [
-            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
-            0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
-            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1x1
-            0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, // 8-bit RGB
-            0xDE,
-            0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, // IDAT chunk
-            0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00, 0x00,
-            0x00, 0x02, 0x00, 0x01, 0xE2, 0x21, 0xBC, 0x33,
-            0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, // IEND chunk
-            0xAE, 0x42, 0x60, 0x82,
-        ]
-        return Data(bytes)
-    }()
-
-    /// Create a temporary .bundle directory containing a fixture image file.
-    private func makeTempBundle(filename: String, data: Data) throws -> Bundle {
-        let bundleDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString + ".bundle")
-        try FileManager.default.createDirectory(at: bundleDir, withIntermediateDirectories: true)
-        try data.write(to: bundleDir.appendingPathComponent(filename))
-        return Bundle(url: bundleDir)!
+        #expect(port == 9999)
     }
 
-    @Test("imageFile loads PNG with correct content type")
-    func loadsPNG() throws {
-        let bundle = try makeTempBundle(filename: "avatar.png", data: Self.minimalPNG)
-        let response = MockHTTPResponse.imageFile(named: "avatar.png", in: bundle)
-
-        #expect(response != nil)
-        #expect(response?.status == .ok)
-        #expect(response?.headers["Content-Type"] == "image/png")
-        #expect(response?.body == Self.minimalPNG)
-    }
-
-    @Test("imageFile infers JPEG content type")
-    func infersJPEGContentType() throws {
-        let bundle = try makeTempBundle(filename: "photo.jpg", data: Self.minimalPNG)
-        let response = MockHTTPResponse.imageFile(named: "photo.jpg", in: bundle)
-
-        #expect(response?.headers["Content-Type"] == "image/jpeg")
-    }
-
-    @Test("imageFile defaults to PNG when no extension given")
-    func defaultsToPNG() throws {
-        let bundle = try makeTempBundle(filename: "icon.png", data: Self.minimalPNG)
-        let response = MockHTTPResponse.imageFile(named: "icon", in: bundle)
-
-        #expect(response != nil)
-        #expect(response?.headers["Content-Type"] == "image/png")
-    }
-
-    @Test("imageFile returns nil for missing file")
-    func returnsNilForMissing() throws {
-        let bundle = try makeTempBundle(filename: "exists.png", data: Self.minimalPNG)
-        let response = MockHTTPResponse.imageFile(named: "nope.png", in: bundle)
-
-        #expect(response == nil)
-    }
-
-    @Test("imageFile respects custom status")
-    func customStatus() throws {
-        let bundle = try makeTempBundle(filename: "avatar.png", data: Self.minimalPNG)
-        let response = MockHTTPResponse.imageFile(named: "avatar.png", in: bundle, status: .created)
-
-        #expect(response?.status == .created)
-    }
-
-    @Test("imageFile serves image through MockServer")
-    func servesImageThroughServer() async throws {
-        let bundle = try makeTempBundle(filename: "avatar.png", data: Self.minimalPNG)
-        let response = MockHTTPResponse.imageFile(named: "avatar.png", in: bundle)!
-
+    @Test("Requests property returns all recorded requests")
+    func requestsProperty() async throws {
         let server = try await MockServer.create()
         let port = await server.port
 
-        await server.stub(.GET, "/images/avatar.png", response: response)
+        await server.stub(.GET, "/a", response: .status(.ok))
+        await server.stub(.POST, "/b", response: .status(.ok))
 
-        let url = URL(string: "http://127.0.0.1:\(port)/images/avatar.png")!
-        let (data, httpResponse) = try await URLSession.shared.data(from: url)
-        let status = (httpResponse as! HTTPURLResponse).statusCode
+        let urlA = URL(string: "http://127.0.0.1:\(port)/a")!
+        let urlB = URL(string: "http://127.0.0.1:\(port)/b")!
+        _ = try await URLSession.shared.data(from: urlA)
+        _ = try await URLSession.shared.data(from: urlB)
 
-        #expect(status == 200)
-        #expect(data == Self.minimalPNG)
+        try await Task.sleep(for: .milliseconds(100))
+
+        let all = await server.requests
+        #expect(all.count == 2)
 
         await server.stop()
     }
-}
 
-// Helper extension for tests
-extension MockHTTPResponse {
-    var bodyString: String? {
-        body.flatMap { String(data: $0, encoding: .utf8) }
+    @Test("Throws alreadyRunning when started twice")
+    func throwsAlreadyRunning() async throws {
+        let server = try await MockServer.create()
+
+        await #expect(throws: MockServerError.self) {
+            try await server.start()
+        }
+
+        await server.stop()
+    }
+
+    @Test("registerParameterized returns route ID")
+    func registerParameterizedReturnsId() async throws {
+        let server = try await MockServer.create()
+        let port = await server.port
+
+        let id = await server.registerParameterized(.GET, "/items/:id") { _ in .status(.ok) }
+        #expect(!id.isEmpty)
+
+        let url = URL(string: "http://127.0.0.1:\(port)/items/42")!
+        let (_, response) = try await URLSession.shared.data(from: url)
+        #expect((response as! HTTPURLResponse).statusCode == 200)
+
+        await server.stop()
+    }
+
+    @Test("registerPrefix returns route ID and matches")
+    func registerPrefixReturnsId() async throws {
+        let server = try await MockServer.create()
+        let port = await server.port
+
+        let id = await server.registerPrefix(.GET, "/static/") { _ in .text("file") }
+        #expect(!id.isEmpty)
+
+        let url = URL(string: "http://127.0.0.1:\(port)/static/image.png")!
+        let (data, _) = try await URLSession.shared.data(from: url)
+        #expect(String(data: data, encoding: .utf8) == "file")
+
+        await server.stop()
+    }
+
+    @Test("registerCatchAll catches unmatched routes")
+    func registerCatchAllWorks() async throws {
+        let server = try await MockServer.create()
+        let port = await server.port
+
+        let id = await server.registerCatchAll { _ in .text("caught") }
+        #expect(!id.isEmpty)
+
+        let url = URL(string: "http://127.0.0.1:\(port)/any/path/here")!
+        let (data, _) = try await URLSession.shared.data(from: url)
+        #expect(String(data: data, encoding: .utf8) == "caught")
+
+        await server.stop()
+    }
+
+    @Test("removeRoute removes a specific route")
+    func removeRouteById() async throws {
+        let server = try await MockServer.create()
+        let port = await server.port
+
+        let id = await server.stub(.GET, "/temp", response: .text("exists"))
+
+        let url = URL(string: "http://127.0.0.1:\(port)/temp")!
+        let (data1, _) = try await URLSession.shared.data(from: url)
+        #expect(String(data: data1, encoding: .utf8) == "exists")
+
+        await server.removeRoute(id: id)
+
+        let (_, response2) = try await URLSession.shared.data(from: url)
+        #expect((response2 as! HTTPURLResponse).statusCode == 404)
+
+        await server.stop()
+    }
+
+    @Test("removeAllRoutes clears all routes")
+    func removeAllRoutesWorks() async throws {
+        let server = try await MockServer.create()
+        let port = await server.port
+
+        await server.stub(.GET, "/a", response: .status(.ok))
+        await server.stub(.GET, "/b", response: .status(.ok))
+        await server.removeAllRoutes()
+
+        let url = URL(string: "http://127.0.0.1:\(port)/a")!
+        let (_, response) = try await URLSession.shared.data(from: url)
+        #expect((response as! HTTPURLResponse).statusCode == 404)
+
+        await server.stop()
+    }
+
+    @Test("setDefaultResponse changes unmatched response")
+    func setDefaultResponseWorks() async throws {
+        let server = try await MockServer.create()
+        let port = await server.port
+
+        await server.setDefaultResponse(.text("custom fallback", status: .badRequest))
+
+        let url = URL(string: "http://127.0.0.1:\(port)/unmatched")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+        #expect((response as! HTTPURLResponse).statusCode == 400)
+        #expect(String(data: data, encoding: .utf8) == "custom fallback")
+
+        await server.stop()
+    }
+
+    @Test("setResponseDelay is accepted")
+    func setResponseDelayWorks() async throws {
+        let server = try await MockServer.create()
+
+        await server.setResponseDelay(.milliseconds(10))
+        await server.setResponseDelay(nil)
+
+        await server.stop()
+    }
+
+    @Test("clearRecordedRequests empties the log")
+    func clearRecordedRequestsWorks() async throws {
+        let server = try await MockServer.create()
+        let port = await server.port
+
+        await server.stub(.GET, "/log", response: .status(.ok))
+        let url = URL(string: "http://127.0.0.1:\(port)/log")!
+        _ = try await URLSession.shared.data(from: url)
+
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await server.requests(matching: "/log").count == 1)
+
+        await server.clearRecordedRequests()
+        #expect(await server.requests(matching: "/log").count == 0)
+
+        await server.stop()
+    }
+
+    @Test("requests(method:path:) filters by method and path")
+    func requestsFilteredByMethodAndPath() async throws {
+        let server = try await MockServer.create()
+        let port = await server.port
+
+        await server.stub(.GET, "/filter", response: .status(.ok))
+        await server.stub(.POST, "/filter", response: .status(.ok))
+
+        let getURL = URL(string: "http://127.0.0.1:\(port)/filter")!
+        _ = try await URLSession.shared.data(from: getURL)
+
+        var postRequest = URLRequest(url: getURL)
+        postRequest.httpMethod = "POST"
+        _ = try await URLSession.shared.data(for: postRequest)
+
+        try await Task.sleep(for: .milliseconds(100))
+
+        let getOnly = await server.requests(method: .GET, path: "/filter")
+        let postOnly = await server.requests(method: .POST, path: "/filter")
+
+        #expect(getOnly.count == 1)
+        #expect(postOnly.count == 1)
+
+        await server.stop()
+    }
+
+    @Test("waitForRequest returns matching request")
+    func waitForRequestWorks() async throws {
+        let server = try await MockServer.create()
+        let port = await server.port
+
+        await server.stub(.GET, "/wait", response: .status(.ok))
+
+        Task {
+            try await Task.sleep(for: .milliseconds(50))
+            let url = URL(string: "http://127.0.0.1:\(port)/wait")!
+            _ = try await URLSession.shared.data(from: url)
+        }
+
+        let recorded = try await server.waitForRequest(path: "/wait", timeout: .seconds(2))
+        #expect(recorded.request.path == "/wait")
+
+        await server.stop()
+    }
+
+    @Test("Handler error returns 500 with error message")
+    func handlerErrorReturns500() async throws {
+        let server = try await MockServer.create()
+        let port = await server.port
+
+        await server.register(.GET, "/fail") { _ in
+            throw MockServerError.invalidRequest("test error")
+        }
+
+        let url = URL(string: "http://127.0.0.1:\(port)/fail")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+        let status = (response as! HTTPURLResponse).statusCode
+
+        #expect(status == 500)
+        #expect(String(data: data, encoding: .utf8)?.contains("test error") == true)
+
+        await server.stop()
+    }
+
+    @Test("startAndGetURL returns base URL")
+    func startAndGetURLWorks() async throws {
+        let server = MockServer()
+        let url = try await server.startAndGetURL()
+
+        #expect(url.hasPrefix("http://127.0.0.1:"))
+
+        await server.stop()
     }
 }

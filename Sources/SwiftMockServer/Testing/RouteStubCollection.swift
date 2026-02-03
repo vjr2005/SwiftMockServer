@@ -38,8 +38,12 @@ public struct RouteStubCollection: Sendable {
 /// Result builder for ergonomic batch route definition.
 @resultBuilder
 public enum RouteStubBuilder {
-    public static func buildBlock(_ components: RouteStubCollection.Stub...) -> [RouteStubCollection.Stub] {
-        components
+    public static func buildExpression(_ expression: RouteStubCollection.Stub) -> [RouteStubCollection.Stub] {
+        [expression]
+    }
+
+    public static func buildBlock(_ components: [RouteStubCollection.Stub]...) -> [RouteStubCollection.Stub] {
+        components.flatMap { $0 }
     }
 
     public static func buildArray(_ components: [[RouteStubCollection.Stub]]) -> [RouteStubCollection.Stub] {

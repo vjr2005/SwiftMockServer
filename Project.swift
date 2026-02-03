@@ -157,7 +157,8 @@ let project = Project(
             buildAction: .buildAction(targets: ["SwiftMockServerExample"]),
             testAction: .targets(
                 [.testableTarget(target: "SwiftMockServerTests")],
-                configuration: "Debug"
+                configuration: "Debug",
+                options: .options(coverage: true, codeCoverageTargets: ["SwiftMockServer"])
             ),
             runAction: .runAction(
                 configuration: "Debug",

@@ -133,10 +133,6 @@ actor SocketListener {
         isListening = false
     }
 
-    private func markStopped() {
-        isListening = false
-    }
-
     deinit {
         acceptSource?.cancel()
         if serverFD >= 0 {
