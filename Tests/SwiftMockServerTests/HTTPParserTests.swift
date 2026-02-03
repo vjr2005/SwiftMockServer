@@ -104,7 +104,7 @@ struct HTTPParserTests {
     func serializeResponse() throws {
         let response = MockHTTPResponse.json("{\"ok\":true}")
         let data = HTTPParser.serialize(response)
-        let string = String(data: data, encoding: .utf8)!
+        let string = try #require(String(data: data, encoding: .utf8))
 
         #expect(string.contains("HTTP/1.1 200 OK"))
         #expect(string.contains("Content-Type: application/json"))

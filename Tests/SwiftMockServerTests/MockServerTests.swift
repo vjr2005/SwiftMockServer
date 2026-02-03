@@ -53,9 +53,9 @@ struct MockServerIntegrationTests {
         {"message": "Hello, World!"}
         """)
 
-        let url = URL(string: "http://[::1]:\(port)/api/hello")!
+        let url = try #require(URL(string: "http://[::1]:\(port)/api/hello"))
         let (data, response) = try await makeSession().data(from: url)
-        let httpResponse = response as! HTTPURLResponse
+        let httpResponse = try #require(response as? HTTPURLResponse)
 
         #expect(httpResponse.statusCode == 200)
 
@@ -70,9 +70,9 @@ struct MockServerIntegrationTests {
         let server = try await MockServer.create()
         let port = await server.port
 
-        let url = URL(string: "http://[::1]:\(port)/nonexistent")!
+        let url = try #require(URL(string: "http://[::1]:\(port)/nonexistent"))
         let (_, response) = try await makeSession().data(from: url)
-        let httpResponse = response as! HTTPURLResponse
+        let httpResponse = try #require(response as? HTTPURLResponse)
 
         #expect(httpResponse.statusCode == 404)
 
@@ -86,7 +86,7 @@ struct MockServerIntegrationTests {
 
         await server.stub(.GET, "/api/track", response: .status(.ok))
 
-        let url = URL(string: "http://[::1]:\(port)/api/track")!
+        let url = try #require(URL(string: "http://[::1]:\(port)/api/track"))
         _ = try await makeSession().data(from: url)
 
         // Give a moment for the request to be recorded
@@ -106,7 +106,7 @@ struct MockServerIntegrationTests {
     func overridesRoutes() async throws {
         let server = try await MockServer.create()
         let port = await server.port
-        let url = URL(string: "http://[::1]:\(port)/api/data")!
+        let url = try #require(URL(string: "http://[::1]:\(port)/api/data"))
 
         let session = makeSession()
 
@@ -149,9 +149,9 @@ struct MockServerIntegrationTests {
 
         // Verify each server responds with its own data
         for (server, port) in servers {
-            let url = URL(string: "http://[::1]:\(port)/api/id")!
+            let url = try #require(URL(string: "http://[::1]:\(port)/api/id"))
             let (data, response) = try await makeSession().data(from: url)
-            let httpResponse = response as! HTTPURLResponse
+            let httpResponse = try #require(response as? HTTPURLResponse)
             #expect(httpResponse.statusCode == 200)
 
             let body = try JSONDecoder().decode([String: Int].self, from: data)
@@ -180,8 +180,8 @@ struct MockServerIntegrationTests {
         await server.stub(.GET, "/a", response: .status(.ok))
         await server.stub(.POST, "/b", response: .status(.ok))
 
-        let urlA = URL(string: "http://[::1]:\(port)/a")!
-        let urlB = URL(string: "http://[::1]:\(port)/b")!
+        let urlA = try #require(URL(string: "http://[::1]:\(port)/a"))
+        let urlB = try #require(URL(string: "http://[::1]:\(port)/b"))
         let session = makeSession()
         _ = try await session.data(from: urlA)
         _ = try await session.data(from: urlB)
@@ -213,9 +213,10 @@ struct MockServerIntegrationTests {
         let id = await server.registerParameterized(.GET, "/items/:id") { _ in .status(.ok) }
         #expect(!id.isEmpty)
 
-        let url = URL(string: "http://[::1]:\(port)/items/42")!
+        let url = try #require(URL(string: "http://[::1]:\(port)/items/42"))
         let (_, response) = try await makeSession().data(from: url)
-        #expect((response as! HTTPURLResponse).statusCode == 200)
+        let httpResponse = try #require(response as? HTTPURLResponse)
+        #expect(httpResponse.statusCode == 200)
 
         await server.stop()
     }
@@ -228,7 +229,7 @@ struct MockServerIntegrationTests {
         let id = await server.registerPrefix(.GET, "/static/") { _ in .text("file") }
         #expect(!id.isEmpty)
 
-        let url = URL(string: "http://[::1]:\(port)/static/image.png")!
+        let url = try #require(URL(string: "http://[::1]:\(port)/static/image.png"))
         let (data, _) = try await makeSession().data(from: url)
         #expect(String(data: data, encoding: .utf8) == "file")
 
@@ -243,7 +244,7 @@ struct MockServerIntegrationTests {
         let id = await server.registerCatchAll { _ in .text("caught") }
         #expect(!id.isEmpty)
 
-        let url = URL(string: "http://[::1]:\(port)/any/path/here")!
+        let url = try #require(URL(string: "http://[::1]:\(port)/any/path/here"))
         let (data, _) = try await makeSession().data(from: url)
         #expect(String(data: data, encoding: .utf8) == "caught")
 
@@ -257,7 +258,7 @@ struct MockServerIntegrationTests {
 
         let id = await server.stub(.GET, "/temp", response: .text("exists"))
 
-        let url = URL(string: "http://[::1]:\(port)/temp")!
+        let url = try #require(URL(string: "http://[::1]:\(port)/temp"))
         let session = makeSession()
         let (data1, _) = try await session.data(from: url)
         #expect(String(data: data1, encoding: .utf8) == "exists")
@@ -265,7 +266,8 @@ struct MockServerIntegrationTests {
         await server.removeRoute(id: id)
 
         let (_, response2) = try await session.data(from: url)
-        #expect((response2 as! HTTPURLResponse).statusCode == 404)
+        let httpResponse2 = try #require(response2 as? HTTPURLResponse)
+        #expect(httpResponse2.statusCode == 404)
 
         await server.stop()
     }
@@ -279,9 +281,10 @@ struct MockServerIntegrationTests {
         await server.stub(.GET, "/b", response: .status(.ok))
         await server.removeAllRoutes()
 
-        let url = URL(string: "http://[::1]:\(port)/a")!
+        let url = try #require(URL(string: "http://[::1]:\(port)/a"))
         let (_, response) = try await makeSession().data(from: url)
-        #expect((response as! HTTPURLResponse).statusCode == 404)
+        let httpResponse = try #require(response as? HTTPURLResponse)
+        #expect(httpResponse.statusCode == 404)
 
         await server.stop()
     }
@@ -293,9 +296,10 @@ struct MockServerIntegrationTests {
 
         await server.setDefaultResponse(.text("custom fallback", status: .badRequest))
 
-        let url = URL(string: "http://[::1]:\(port)/unmatched")!
+        let url = try #require(URL(string: "http://[::1]:\(port)/unmatched"))
         let (data, response) = try await makeSession().data(from: url)
-        #expect((response as! HTTPURLResponse).statusCode == 400)
+        let httpResponse = try #require(response as? HTTPURLResponse)
+        #expect(httpResponse.statusCode == 400)
         #expect(String(data: data, encoding: .utf8) == "custom fallback")
 
         await server.stop()
@@ -317,7 +321,7 @@ struct MockServerIntegrationTests {
         let port = await server.port
 
         await server.stub(.GET, "/log", response: .status(.ok))
-        let url = URL(string: "http://[::1]:\(port)/log")!
+        let url = try #require(URL(string: "http://[::1]:\(port)/log"))
         _ = try await makeSession().data(from: url)
 
         _ = try await server.waitForRequest(path: "/log", timeout: .seconds(2))
@@ -337,7 +341,7 @@ struct MockServerIntegrationTests {
         await server.stub(.GET, "/filter", response: .status(.ok))
         await server.stub(.POST, "/filter", response: .status(.ok))
 
-        let getURL = URL(string: "http://[::1]:\(port)/filter")!
+        let getURL = try #require(URL(string: "http://[::1]:\(port)/filter"))
         let session = makeSession()
         _ = try await session.data(from: getURL)
 
@@ -366,7 +370,7 @@ struct MockServerIntegrationTests {
         let session = makeSession()
         Task {
             try await Task.sleep(for: .milliseconds(100))
-            let url = URL(string: "http://[::1]:\(port)/wait")!
+            let url = try #require(URL(string: "http://[::1]:\(port)/wait"))
             _ = try await session.data(from: url)
         }
 
@@ -385,11 +389,11 @@ struct MockServerIntegrationTests {
             throw MockServerError.invalidRequest("test error")
         }
 
-        let url = URL(string: "http://[::1]:\(port)/fail")!
+        let url = try #require(URL(string: "http://[::1]:\(port)/fail"))
         let (data, response) = try await makeSession().data(from: url)
-        let status = (response as! HTTPURLResponse).statusCode
+        let httpResponse = try #require(response as? HTTPURLResponse)
 
-        #expect(status == 500)
+        #expect(httpResponse.statusCode == 500)
         #expect(String(data: data, encoding: .utf8)?.contains("test error") == true)
 
         await server.stop()

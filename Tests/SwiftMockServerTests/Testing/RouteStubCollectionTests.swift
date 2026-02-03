@@ -19,7 +19,7 @@ struct RouteStubCollectionTests {
         await server.registerAll(collection)
         let port = await server.port
 
-        let healthURL = URL(string: "http://[::1]:\(port)/api/health")!
+        let healthURL = try #require(URL(string: "http://[::1]:\(port)/api/health"))
         let (data, _) = try await makeSession().data(from: healthURL)
         #expect(String(data: data, encoding: .utf8) == "ok")
 

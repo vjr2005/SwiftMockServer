@@ -33,7 +33,7 @@ struct ImageFileTests {
             .appendingPathComponent(UUID().uuidString + ".bundle")
         try FileManager.default.createDirectory(at: bundleDir, withIntermediateDirectories: true)
         try data.write(to: bundleDir.appendingPathComponent(filename))
-        return Bundle(url: bundleDir)!
+        return try #require(Bundle(url: bundleDir))
     }
 
     @Test("imageFile loads PNG with correct content type")
@@ -83,16 +83,16 @@ struct ImageFileTests {
     @Test("imageFile serves image through MockServer")
     func servesImageThroughServer() async throws {
         let bundle = try makeTempBundle(filename: "avatar.png", data: Self.minimalPNG)
-        let response = MockHTTPResponse.imageFile(named: "avatar.png", in: bundle)!
+        let response = try #require(MockHTTPResponse.imageFile(named: "avatar.png", in: bundle))
 
         let server = try await MockServer.create()
         let port = await server.port
 
         await server.stub(.GET, "/images/avatar.png", response: response)
 
-        let url = URL(string: "http://[::1]:\(port)/images/avatar.png")!
+        let url = try #require(URL(string: "http://[::1]:\(port)/images/avatar.png"))
         let (data, httpResponse) = try await makeSession().data(from: url)
-        let status = (httpResponse as! HTTPURLResponse).statusCode
+        let status = try #require(httpResponse as? HTTPURLResponse).statusCode
 
         #expect(status == 200)
         #expect(data == Self.minimalPNG)
@@ -109,9 +109,9 @@ struct ImageFileTests {
 
         try await server.stubImage(.GET, "/logo.png", named: "logo.png", in: bundle)
 
-        let url = URL(string: "http://[::1]:\(port)/logo.png")!
+        let url = try #require(URL(string: "http://[::1]:\(port)/logo.png"))
         let (data, httpResponse) = try await makeSession().data(from: url)
-        let status = (httpResponse as! HTTPURLResponse).statusCode
+        let status = try #require(httpResponse as? HTTPURLResponse).statusCode
 
         #expect(status == 200)
         #expect(data == Self.minimalPNG)
@@ -166,7 +166,7 @@ struct JSONFileTests {
             .appendingPathComponent(UUID().uuidString + ".bundle")
         try FileManager.default.createDirectory(at: bundleDir, withIntermediateDirectories: true)
         try data.write(to: bundleDir.appendingPathComponent(filename))
-        return Bundle(url: bundleDir)!
+        return try #require(Bundle(url: bundleDir))
     }
 
     @Test("jsonFile loads file with extension")
