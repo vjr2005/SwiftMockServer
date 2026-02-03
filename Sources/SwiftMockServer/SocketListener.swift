@@ -23,6 +23,12 @@ typealias ConnectionHandler = @Sendable (MockHTTPRequest) async -> MockHTTPRespo
 /// No thread is ever blocked — accept and read are event-driven via GCD sources.
 actor SocketListener {
 
+    /// Ignore SIGPIPE once at process startup. Writing to a closed socket
+    /// returns EPIPE instead of crashing the process.
+    private static let ignoreSIGPIPE: Void = {
+        signal(SIGPIPE, SIG_IGN)
+    }()
+
     private var serverFD: Int32 = -1
     private var isListening = false
     private var acceptSource: DispatchSourceRead?
@@ -33,9 +39,11 @@ actor SocketListener {
     var port: UInt16 { assignedPort }
 
     /// Initialize and bind to a port. Pass 0 for automatic port assignment.
-    /// Uses IPv4 loopback (127.0.0.1) for maximum compatibility with URLSession.
+    /// Uses IPv6 loopback (::1) to avoid IPv4 ephemeral port exhaustion issues.
+    /// URLSession connects via `localhost` which resolves to ::1.
     init(port: UInt16 = 0) throws {
-        let fd = socket(AF_INET, SOCK_STREAM, 0)
+        _ = Self.ignoreSIGPIPE
+        let fd = socket(AF_INET6, SOCK_STREAM, 0)
         guard fd >= 0 else {
             throw MockServerError.bindFailed("Cannot create socket: \(String(cString: strerror(errno)))")
         }
@@ -44,19 +52,23 @@ actor SocketListener {
         var reuse: Int32 = 1
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, socklen_t(MemoryLayout<Int32>.size))
 
+        // IPv6-only (no dual-stack; localhost resolves to ::1)
+        var v6only: Int32 = 1
+        setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, socklen_t(MemoryLayout<Int32>.size))
+
         // Set non-blocking mode
         let flags = fcntl(fd, F_GETFL)
         _ = fcntl(fd, F_SETFL, flags | O_NONBLOCK)
 
-        // Bind to IPv4 loopback
-        var addr = sockaddr_in()
-        addr.sin_family = sa_family_t(AF_INET)
-        addr.sin_port = port.bigEndian
-        addr.sin_addr.s_addr = UInt32(INADDR_LOOPBACK).bigEndian
+        // Bind to IPv6 loopback
+        var addr = sockaddr_in6()
+        addr.sin6_family = sa_family_t(AF_INET6)
+        addr.sin6_port = port.bigEndian
+        addr.sin6_addr = in6addr_loopback
 
         let bindResult = withUnsafePointer(to: &addr) { addrPtr in
             addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockaddrPtr in
-                bind(fd, sockaddrPtr, socklen_t(MemoryLayout<sockaddr_in>.size))
+                bind(fd, sockaddrPtr, socklen_t(MemoryLayout<sockaddr_in6>.size))
             }
         }
 
@@ -66,13 +78,13 @@ actor SocketListener {
         }
 
         // Determine actual port (important when port == 0)
-        var boundAddr = sockaddr_in()
-        var boundLen = socklen_t(MemoryLayout<sockaddr_in>.size)
+        var boundAddr = sockaddr_in6()
+        var boundLen = socklen_t(MemoryLayout<sockaddr_in6>.size)
         getsockname(fd, withUnsafeMutablePointer(to: &boundAddr) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { $0 }
         }, &boundLen)
 
-        self.assignedPort = UInt16(bigEndian: boundAddr.sin_port)
+        self.assignedPort = UInt16(bigEndian: boundAddr.sin6_port)
         self.serverFD = fd
         self.acceptQueue = DispatchQueue(label: "MockServer.accept.\(assignedPort)")
     }
@@ -97,8 +109,8 @@ actor SocketListener {
         source.setEventHandler {
             // Drain all pending connections
             while true {
-                var clientAddr = sockaddr_in()
-                var clientAddrLen = socklen_t(MemoryLayout<sockaddr_in>.size)
+                var clientAddr = sockaddr_storage()
+                var clientAddrLen = socklen_t(MemoryLayout<sockaddr_storage>.size)
 
                 let clientFD = withUnsafeMutablePointer(to: &clientAddr) { addrPtr in
                     addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockaddrPtr in
@@ -113,9 +125,7 @@ actor SocketListener {
                 ConnectionDispatcher.handle(clientFD: clientFD, using: handler)
             }
         }
-        source.setCancelHandler {
-            close(fd)
-        }
+        source.setCancelHandler { /* fd is closed in stop() */ }
         source.resume()
         acceptSource = source
     }
@@ -125,8 +135,8 @@ actor SocketListener {
         if let source = acceptSource {
             source.cancel()
             acceptSource = nil
-            serverFD = -1
-        } else if serverFD >= 0 {
+        }
+        if serverFD >= 0 {
             close(serverFD)
             serverFD = -1
         }
@@ -151,6 +161,10 @@ enum ConnectionDispatcher: Sendable {
         // Set a short read timeout as safety net (localhost data arrives in <1ms)
         var timeout = timeval(tv_sec: 2, tv_usec: 0)
         setsockopt(clientFD, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+
+        // Prevent SIGPIPE when writing to a client that has already disconnected
+        var noSigPipe: Int32 = 1
+        setsockopt(clientFD, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, socklen_t(MemoryLayout<Int32>.size))
 
         let ioQueue = DispatchQueue(label: "MockServer.io.\(clientFD)")
 
@@ -235,8 +249,11 @@ enum ConnectionDispatcher: Sendable {
     }
 
     /// Close a client connection.
+    /// Uses SO_LINGER with zero timeout to send RST instead of FIN,
+    /// preventing TIME_WAIT accumulation on the loopback interface.
     private static func closeConnection(_ fd: Int32) {
-        shutdown(fd, SHUT_RDWR)
+        var ling = linger(l_onoff: 1, l_linger: 0)
+        setsockopt(fd, SOL_SOCKET, SO_LINGER, &ling, socklen_t(MemoryLayout<linger>.size))
         close(fd)
     }
 }

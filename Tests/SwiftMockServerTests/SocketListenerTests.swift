@@ -59,15 +59,15 @@ struct SocketListenerTests {
         let port = await server.port
 
         // Open a raw TCP connection and close it without sending data
-        let fd = socket(AF_INET, SOCK_STREAM, 0)
-        var addr = sockaddr_in()
-        addr.sin_family = sa_family_t(AF_INET)
-        addr.sin_port = port.bigEndian
-        addr.sin_addr.s_addr = UInt32(INADDR_LOOPBACK).bigEndian
+        let fd = socket(AF_INET6, SOCK_STREAM, 0)
+        var addr = sockaddr_in6()
+        addr.sin6_family = sa_family_t(AF_INET6)
+        addr.sin6_port = port.bigEndian
+        addr.sin6_addr = in6addr_loopback
 
         withUnsafePointer(to: &addr) { addrPtr in
             addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockaddrPtr in
-                _ = connect(fd, sockaddrPtr, socklen_t(MemoryLayout<sockaddr_in>.size))
+                _ = connect(fd, sockaddrPtr, socklen_t(MemoryLayout<sockaddr_in6>.size))
             }
         }
         close(fd)
@@ -86,15 +86,15 @@ struct SocketListenerTests {
         await server.stub(.GET, "/chunked", response: .text("ok"))
 
         // Send a valid HTTP request in two separate writes with a delay
-        let fd = socket(AF_INET, SOCK_STREAM, 0)
-        var addr = sockaddr_in()
-        addr.sin_family = sa_family_t(AF_INET)
-        addr.sin_port = port.bigEndian
-        addr.sin_addr.s_addr = UInt32(INADDR_LOOPBACK).bigEndian
+        let fd = socket(AF_INET6, SOCK_STREAM, 0)
+        var addr = sockaddr_in6()
+        addr.sin6_family = sa_family_t(AF_INET6)
+        addr.sin6_port = port.bigEndian
+        addr.sin6_addr = in6addr_loopback
 
         withUnsafePointer(to: &addr) { addrPtr in
             addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockaddrPtr in
-                _ = connect(fd, sockaddrPtr, socklen_t(MemoryLayout<sockaddr_in>.size))
+                _ = connect(fd, sockaddrPtr, socklen_t(MemoryLayout<sockaddr_in6>.size))
             }
         }
 
@@ -103,7 +103,7 @@ struct SocketListenerTests {
         _ = partial.withCString { send(fd, $0, strlen($0), 0) }
 
         // Wait so the server reads partial data and hits the "wait for more" return
-        try await Task.sleep(for: .milliseconds(50))
+        try await Task.sleep(for: .milliseconds(200))
 
         // Now send the rest to complete the request
         let rest = "\r\n"
@@ -111,7 +111,7 @@ struct SocketListenerTests {
 
         // Read the response
         var buf = [UInt8](repeating: 0, count: 4096)
-        try await Task.sleep(for: .milliseconds(100))
+        try await Task.sleep(for: .milliseconds(200))
         let n = recv(fd, &buf, buf.count, 0)
         close(fd)
 

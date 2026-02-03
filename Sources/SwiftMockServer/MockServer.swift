@@ -27,9 +27,9 @@ import Foundation
 ///     """)
 /// }
 ///
-/// let port = await server.port
+/// let baseURL = await server.baseURL
 /// let app = XCUIApplication()
-/// app.launchEnvironment["API_BASE_URL"] = "http://localhost:\(port)"
+/// app.launchEnvironment["API_BASE_URL"] = baseURL
 /// app.launch()
 /// ```
 public actor MockServer {
@@ -61,7 +61,7 @@ public actor MockServer {
     public var baseURL: String {
         get async {
             let p = await port
-            return "http://127.0.0.1:\(p)"
+            return "http://localhost:\(p)"
         }
     }
 

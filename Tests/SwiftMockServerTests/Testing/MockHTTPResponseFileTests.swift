@@ -90,8 +90,8 @@ struct ImageFileTests {
 
         await server.stub(.GET, "/images/avatar.png", response: response)
 
-        let url = URL(string: "http://127.0.0.1:\(port)/images/avatar.png")!
-        let (data, httpResponse) = try await URLSession.shared.data(from: url)
+        let url = URL(string: "http://[::1]:\(port)/images/avatar.png")!
+        let (data, httpResponse) = try await makeSession().data(from: url)
         let status = (httpResponse as! HTTPURLResponse).statusCode
 
         #expect(status == 200)
@@ -109,8 +109,8 @@ struct ImageFileTests {
 
         try await server.stubImage(.GET, "/logo.png", named: "logo.png", in: bundle)
 
-        let url = URL(string: "http://127.0.0.1:\(port)/logo.png")!
-        let (data, httpResponse) = try await URLSession.shared.data(from: url)
+        let url = URL(string: "http://[::1]:\(port)/logo.png")!
+        let (data, httpResponse) = try await makeSession().data(from: url)
         let status = (httpResponse as! HTTPURLResponse).statusCode
 
         #expect(status == 200)
