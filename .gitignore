@@ -1,0 +1,35 @@
+# Tuist generated files
+*.xcodeproj
+*.xcworkspace
+Derived/
+
+# Xcode
+xcuserdata/
+*.xcscmblueprint
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# mise (local overrides — do not commit)
+mise.local.toml
+.mise.local.toml
+
+# macOS
+.DS_Store
+._*
+
+# IDE
+*.swp
+*~
+.vscode/
+.idea/
