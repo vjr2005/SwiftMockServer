@@ -10,16 +10,17 @@ A lightweight, embeddable HTTP mock server for Swift testing. Built with Swift 6
 
 Most HTTP mocking libraries for Swift intercept requests at the `URLProtocol` level. This works for unit tests but **breaks in XCUITest**, where the test process and the app process are separate. SwiftMockServer runs a real TCP server on the IPv6 loopback (`[::1]`), so it works everywhere — unit tests, integration tests, and UI tests.
 
-| Feature | SwiftMockServer | [OHHTTPStubs](https://github.com/AliSoftware/OHHTTPStubs) | [Mocker](https://github.com/WeTransfer/Mocker) | [Swifter](https://github.com/httpswift/swifter) | [Embassy](https://github.com/nicklama/Embassy) |
+| Feature | SwiftMockServer | [OHHTTPStubs](https://github.com/AliSoftware/OHHTTPStubs) | [Mocker](https://github.com/WeTransfer/Mocker) | [Swifter](https://github.com/httpswift/swifter) | [Embassy](https://github.com/envoy/Embassy) |
 |---------|:-:|:-:|:-:|:-:|:-:|
 | Real TCP server | **Yes** | No (URLProtocol) | No (URLProtocol) | Yes | Yes |
 | Works in XCUITest | **Yes** | No | No | Yes | Yes |
+| Pure Swift | **Yes** | No (Objective-C) | Yes | Yes | Yes |
 | Swift 6 strict concurrency | **Yes** | No | No | No | No |
 | Actor-based / thread-safe | **Yes** | No | No | No | No |
-| Zero dependencies | **Yes** | No | Yes | Yes | No |
+| Async/await API | **Yes** | No | No | No | No |
+| Zero dependencies | **Yes** | Yes | Yes | Yes | Yes |
 | Request recording & verification | **Yes** | No | Limited | No | No |
 | Result builder for batch stubs | **Yes** | No | No | No | No |
-| Actively maintained for modern Swift | **Yes** | Minimal | Yes | Minimal | No |
 
 **In short:** if you need a mock server that is concurrency-safe, works in UI tests, and has zero dependencies, SwiftMockServer is the only option in the Swift ecosystem.
 
