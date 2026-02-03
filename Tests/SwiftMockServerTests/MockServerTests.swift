@@ -381,6 +381,102 @@ struct RouteStubCollectionTests {
     }
 }
 
+// MARK: - Image File Tests
+
+@Suite("Image File Helper")
+struct ImageFileTests {
+
+    /// Minimal valid 1x1 white PNG (67 bytes).
+    private static let minimalPNG: Data = {
+        let bytes: [UInt8] = [
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+            0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1x1
+            0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, // 8-bit RGB
+            0xDE,
+            0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, // IDAT chunk
+            0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00, 0x00,
+            0x00, 0x02, 0x00, 0x01, 0xE2, 0x21, 0xBC, 0x33,
+            0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, // IEND chunk
+            0xAE, 0x42, 0x60, 0x82,
+        ]
+        return Data(bytes)
+    }()
+
+    /// Create a temporary .bundle directory containing a fixture image file.
+    private func makeTempBundle(filename: String, data: Data) throws -> Bundle {
+        let bundleDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + ".bundle")
+        try FileManager.default.createDirectory(at: bundleDir, withIntermediateDirectories: true)
+        try data.write(to: bundleDir.appendingPathComponent(filename))
+        return Bundle(url: bundleDir)!
+    }
+
+    @Test("imageFile loads PNG with correct content type")
+    func loadsPNG() throws {
+        let bundle = try makeTempBundle(filename: "avatar.png", data: Self.minimalPNG)
+        let response = MockHTTPResponse.imageFile(named: "avatar.png", in: bundle)
+
+        #expect(response != nil)
+        #expect(response?.status == .ok)
+        #expect(response?.headers["Content-Type"] == "image/png")
+        #expect(response?.body == Self.minimalPNG)
+    }
+
+    @Test("imageFile infers JPEG content type")
+    func infersJPEGContentType() throws {
+        let bundle = try makeTempBundle(filename: "photo.jpg", data: Self.minimalPNG)
+        let response = MockHTTPResponse.imageFile(named: "photo.jpg", in: bundle)
+
+        #expect(response?.headers["Content-Type"] == "image/jpeg")
+    }
+
+    @Test("imageFile defaults to PNG when no extension given")
+    func defaultsToPNG() throws {
+        let bundle = try makeTempBundle(filename: "icon.png", data: Self.minimalPNG)
+        let response = MockHTTPResponse.imageFile(named: "icon", in: bundle)
+
+        #expect(response != nil)
+        #expect(response?.headers["Content-Type"] == "image/png")
+    }
+
+    @Test("imageFile returns nil for missing file")
+    func returnsNilForMissing() throws {
+        let bundle = try makeTempBundle(filename: "exists.png", data: Self.minimalPNG)
+        let response = MockHTTPResponse.imageFile(named: "nope.png", in: bundle)
+
+        #expect(response == nil)
+    }
+
+    @Test("imageFile respects custom status")
+    func customStatus() throws {
+        let bundle = try makeTempBundle(filename: "avatar.png", data: Self.minimalPNG)
+        let response = MockHTTPResponse.imageFile(named: "avatar.png", in: bundle, status: .created)
+
+        #expect(response?.status == .created)
+    }
+
+    @Test("imageFile serves image through MockServer")
+    func servesImageThroughServer() async throws {
+        let bundle = try makeTempBundle(filename: "avatar.png", data: Self.minimalPNG)
+        let response = MockHTTPResponse.imageFile(named: "avatar.png", in: bundle)!
+
+        let server = try await MockServer.create()
+        let port = await server.port
+
+        await server.stub(.GET, "/images/avatar.png", response: response)
+
+        let url = URL(string: "http://127.0.0.1:\(port)/images/avatar.png")!
+        let (data, httpResponse) = try await URLSession.shared.data(from: url)
+        let status = (httpResponse as! HTTPURLResponse).statusCode
+
+        #expect(status == 200)
+        #expect(data == Self.minimalPNG)
+
+        await server.stop()
+    }
+}
+
 // Helper extension for tests
 extension MockHTTPResponse {
     var bodyString: String? {
