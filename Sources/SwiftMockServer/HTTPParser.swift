@@ -6,10 +6,34 @@
 
 import Foundation
 
-/// A stateless HTTP/1.1 request parser. Thread-safe by design (no mutable state).
+/// Stateless HTTP/1.1 request parser and response serializer.
+///
+/// All functions are pure/static — no mutable state, inherently thread-safe.
+///
+/// > Note: You normally don't call `HTTPParser` directly — ``MockServer`` uses it
+/// > internally to parse incoming connections and serialize responses. It's public
+/// > for advanced use cases like testing HTTP handling in isolation.
+///
+/// ```swift
+/// // Parse raw HTTP data into a request
+/// let data = "GET /api/users HTTP/1.1\r\nHost: localhost\r\n\r\n".data(using: .utf8)!
+/// let request = try HTTPParser.parse(data)
+/// print(request.method) // .GET
+/// print(request.path)   // "/api/users"
+///
+/// // Serialize a response into raw HTTP data
+/// let response = MockHTTPResponse.json(#"{"ok": true}"#)
+/// let responseData = HTTPParser.serialize(response)
+/// ```
 public enum HTTPParser: Sendable {
 
-    /// Parse raw HTTP data into a MockHTTPRequest.
+    /// Parse raw HTTP/1.1 data into a ``MockHTTPRequest``.
+    ///
+    /// Extracts the method, path, query parameters, headers, and body.
+    ///
+    /// - Parameter data: Raw HTTP request data (UTF-8).
+    /// - Returns: A parsed ``MockHTTPRequest``.
+    /// - Throws: ``MockServerError/invalidRequest(_:)`` if the data is malformed.
     public static func parse(_ data: Data) throws -> MockHTTPRequest {
         guard let string = String(data: data, encoding: .utf8) else {
             throw MockServerError.invalidRequest("Cannot decode data as UTF-8")
@@ -95,7 +119,13 @@ public enum HTTPParser: Sendable {
         return (path, queryParameters)
     }
 
-    /// Serialize a MockHTTPResponse into raw HTTP data for sending over the wire.
+    /// Serialize a ``MockHTTPResponse`` into raw HTTP/1.1 data for sending over the wire.
+    ///
+    /// Automatically adds `Content-Length`, `Connection: close`, and `Server` headers
+    /// if not already present.
+    ///
+    /// - Parameter response: The response to serialize.
+    /// - Returns: Raw HTTP response data ready to write to a socket.
     public static func serialize(_ response: MockHTTPResponse) -> Data {
         var result = "HTTP/1.1 \(response.status.code) \(response.status.reason)\r\n"
 

@@ -1,10 +1,37 @@
 // RouterEngine.swift
 // SwiftMockServer
 
-/// Thread-safe route matching engine. Uses value types and pure functions.
+/// Stateless route matching engine.
+///
+/// Matches a ``MockHTTPRequest`` against an ordered list of ``Route``s.
+/// Thread-safe by design — all functions are pure/static with no mutable state.
+///
+/// Routes are evaluated in array order (the server inserts new routes at index 0,
+/// giving LIFO semantics). The first match wins.
+///
+/// ```swift
+/// let routes: [Route] = [...]
+/// let request = MockHTTPRequest(method: .GET, path: "/api/users")
+///
+/// if let match = RouterEngine.match(request: request, routes: routes) {
+///     let response = try await match.route.handler(request)
+/// }
+/// ```
+///
+/// > Note: You normally don't call `RouterEngine` directly — ``MockServer``
+/// > uses it internally. It's public for advanced use cases like custom routing logic.
 public enum RouterEngine: Sendable {
 
     /// Find the first matching route for a request.
+    ///
+    /// Iterates through `routes` in order, checking method and pattern.
+    /// Returns the first ``RouteMatch`` found, or `nil` if no route matches.
+    ///
+    /// - Parameters:
+    ///   - request: The incoming HTTP request to match.
+    ///   - routes: An ordered array of routes to match against.
+    /// - Returns: A ``RouteMatch`` with the matched route and any path parameters,
+    ///   or `nil` if no route matches.
     public static func match(
         request: MockHTTPRequest,
         routes: [Route]
