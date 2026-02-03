@@ -318,8 +318,48 @@ let response = MockHTTPResponse.data(pdfData, contentType: "application/pdf")
 // JSON file from bundle
 let response = MockHTTPResponse.jsonFile(named: "users.json", in: .module)
 
+// Image with auto-detected content type (from magic bytes, falls back to PNG)
+let response = MockHTTPResponse.image(imageData)
+
+// Image with explicit content type
+let response = MockHTTPResponse.image(imageData, contentType: .jpeg)
+
 // Image file from bundle (supports png, jpg, gif, webp, svg, heic, tiff, bmp, ico)
 let response = MockHTTPResponse.imageFile(named: "avatar.png", in: .module)
+```
+
+---
+
+### ImageContentType
+
+Image MIME content types for use with `.image(_:contentType:status:)` and `.imageFile(named:in:status:)`.
+
+```swift
+public enum ImageContentType: String, Sendable {
+    case png  = "image/png"
+    case jpeg = "image/jpeg"
+    case gif  = "image/gif"
+    case webp = "image/webp"
+    case svg  = "image/svg+xml"
+    case heic = "image/heic"
+    case tiff = "image/tiff"
+    case bmp  = "image/bmp"
+    case ico  = "image/x-icon"
+}
+```
+
+**Initializers:**
+
+| Initializer | Description |
+|-------------|-------------|
+| `init?(fileExtension:)` | From a file extension (e.g. `"png"`, `"jpg"`, `"tif"`). Returns `nil` for unrecognized extensions. |
+| `init?(detecting:)` | From raw `Data` by inspecting magic bytes. Returns `nil` for unrecognized or empty data. |
+
+**Magic byte detection** supports: PNG, JPEG, GIF, WebP, BMP, TIFF (little-endian and big-endian), ICO, and HEIC (heic/heix/mif1 brands). SVG is excluded because it is text-based and unreliable to detect from raw bytes.
+
+```swift
+let type = ImageContentType(fileExtension: "jpg")   // .jpeg
+let type = ImageContentType(detecting: pngData)      // .png (from magic bytes)
 ```
 
 ---
@@ -493,7 +533,24 @@ await server.stub(.GET, "/api/users",
     response: .jsonFile(named: "users.json", in: .module)!)
 ```
 
-### 4. Serve an Image from a Fixture
+### 4. Serve an Image
+
+**From raw data (auto-detects format):**
+
+```swift
+let pngData = try Data(contentsOf: pngURL)
+await server.stub(.GET, "/avatar.png", response: .image(pngData))
+// Content-Type is auto-detected from magic bytes (PNG in this case)
+```
+
+**From raw data with explicit type:**
+
+```swift
+await server.stub(.GET, "/photo.jpg",
+    response: .image(jpegData, contentType: .jpeg))
+```
+
+**From a fixture file in a bundle:**
 
 ```swift
 try await server.stubImage(.GET, "/avatar.png",
@@ -507,7 +564,9 @@ await server.stub(.GET, "/avatar.png",
     response: .imageFile(named: "avatar.png", in: .module)!)
 ```
 
-Supports: `png`, `jpg`, `gif`, `webp`, `svg`, `heic`, `tiff`, `bmp`, `ico`.
+Supported image formats: `png`, `jpg`, `gif`, `webp`, `svg`, `heic`, `tiff`, `bmp`, `ico`.
+
+Auto-detection from magic bytes works for all formats except SVG (which is text-based). When detection fails, `.png` is used as fallback.
 
 ### 5. Parameterized Routes (`/users/:id`)
 

@@ -98,17 +98,6 @@ extension MockHTTPResponse {
     }
 
     private static func imageContentType(for ext: String) -> String {
-        switch ext.lowercased() {
-        case "png":             return "image/png"
-        case "jpg", "jpeg":     return "image/jpeg"
-        case "gif":             return "image/gif"
-        case "webp":            return "image/webp"
-        case "svg":             return "image/svg+xml"
-        case "heic":            return "image/heic"
-        case "tiff", "tif":     return "image/tiff"
-        case "bmp":             return "image/bmp"
-        case "ico":             return "image/x-icon"
-        default:                return "application/octet-stream"
-        }
+        ImageContentType(fileExtension: ext)?.rawValue ?? "application/octet-stream"
     }
 }
