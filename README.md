@@ -8,7 +8,7 @@ A lightweight, embeddable HTTP mock server for Swift testing. Built with Swift 6
 
 ## Why SwiftMockServer?
 
-Most HTTP mocking libraries for Swift intercept requests at the `URLProtocol` level. This works for unit tests but **breaks in XCUITest**, where the test process and the app process are separate. SwiftMockServer runs a real TCP server on `localhost`, so it works everywhere — unit tests, integration tests, and UI tests.
+Most HTTP mocking libraries for Swift intercept requests at the `URLProtocol` level. This works for unit tests but **breaks in XCUITest**, where the test process and the app process are separate. SwiftMockServer runs a real TCP server on the IPv6 loopback (`[::1]`), so it works everywhere — unit tests, integration tests, and UI tests.
 
 | Feature | SwiftMockServer | [OHHTTPStubs](https://github.com/AliSoftware/OHHTTPStubs) | [Mocker](https://github.com/WeTransfer/Mocker) | [Swifter](https://github.com/httpswift/swifter) | [Embassy](https://github.com/nicklama/Embassy) |
 |---------|:-:|:-:|:-:|:-:|:-:|
@@ -95,7 +95,7 @@ let server = try await MockServer.create(port: 0)
 | Property | Type | Description |
 |----------|------|-------------|
 | `port` | `UInt16` | The port the server is listening on (async) |
-| `baseURL` | `String` | Full base URL, e.g. `"http://127.0.0.1:54321"` (async) |
+| `baseURL` | `String` | Full base URL, e.g. `"http://[::1]:54321"` (async) |
 | `isRunning` | `Bool` | Whether the server is currently running |
 | `requests` | `[RecordedRequest]` | All recorded incoming requests |
 
@@ -749,8 +749,8 @@ let dataServer = try await MockServer.create()
 await authServer.stubJSON(.POST, "/login", json: #"{"token": "x"}"#)
 await dataServer.stubJSON(.GET, "/items", json: "[]")
 
-let authURL = await authServer.baseURL  // e.g. http://127.0.0.1:54321
-let dataURL = await dataServer.baseURL  // e.g. http://127.0.0.1:54322
+let authURL = await authServer.baseURL  // e.g. http://[::1]:54321
+let dataURL = await dataServer.baseURL  // e.g. http://[::1]:54322
 
 // Point different services at different servers
 

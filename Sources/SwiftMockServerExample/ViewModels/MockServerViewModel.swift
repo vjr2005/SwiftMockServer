@@ -29,7 +29,7 @@ final class MockServerViewModel {
             isRunning = true
             port = await newServer.port
             if let p = port {
-                baseURL = "http://localhost:\(p)"
+                baseURL = "http://[::1]:\(p)"
             }
         } catch {
             isRunning = false

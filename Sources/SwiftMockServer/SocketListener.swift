@@ -40,7 +40,7 @@ actor SocketListener {
 
     /// Initialize and bind to a port. Pass 0 for automatic port assignment.
     /// Uses IPv6 loopback (::1) to avoid IPv4 ephemeral port exhaustion issues.
-    /// URLSession connects via `localhost` which resolves to ::1.
+    /// URLSession connects via `[::1]` to avoid ambiguous localhost resolution.
     init(port: UInt16 = 0) throws {
         _ = Self.ignoreSIGPIPE
         let fd = socket(AF_INET6, SOCK_STREAM, 0)
@@ -52,7 +52,7 @@ actor SocketListener {
         var reuse: Int32 = 1
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, socklen_t(MemoryLayout<Int32>.size))
 
-        // IPv6-only (no dual-stack; localhost resolves to ::1)
+        // IPv6-only (no dual-stack; baseURL uses [::1] directly)
         var v6only: Int32 = 1
         setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, socklen_t(MemoryLayout<Int32>.size))
 

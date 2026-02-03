@@ -14,7 +14,7 @@ struct AppConfigTests {
         let config = await server.appConfig()
 
         #expect(config.launchArguments.contains("-useMockServer"))
-        #expect(config.launchEnvironment["MOCK_SERVER_URL"]?.hasPrefix("http://localhost:") == true)
+        #expect(config.launchEnvironment["MOCK_SERVER_URL"]?.hasPrefix("http://[::1]:") == true)
         #expect(config.launchEnvironment["MOCK_SERVER_PORT"] != nil)
         #expect(config.port > 0)
 

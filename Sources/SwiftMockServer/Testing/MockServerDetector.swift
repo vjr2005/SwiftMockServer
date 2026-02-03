@@ -46,7 +46,7 @@ public enum MockServerDetector: Sendable {
         isUsingMockServer(arguments: ProcessInfo.processInfo.arguments)
     }
 
-    /// The mock server's base URL from the launch environment (e.g., `"http://localhost:54321"`).
+    /// The mock server's base URL from the launch environment (e.g., `"http://[::1]:54321"`).
     ///
     /// Returns `nil` if the `MOCK_SERVER_URL` environment variable is not set.
     ///

@@ -404,7 +404,7 @@ struct MockServerIntegrationTests {
         let server = MockServer()
         let url = try await server.startAndGetURL()
 
-        #expect(url.hasPrefix("http://localhost:"))
+        #expect(url.hasPrefix("http://[::1]:"))
 
         await server.stop()
     }

@@ -83,7 +83,7 @@ public actor MockServer {
         }
     }
 
-    /// The base URL for this server (e.g., `"http://localhost:54321"`).
+    /// The base URL for this server (e.g., `"http://[::1]:54321"`).
     ///
     /// Use this to construct full URLs for requests:
     ///
@@ -93,7 +93,7 @@ public actor MockServer {
     public var baseURL: String {
         get async {
             let p = await port
-            return "http://localhost:\(p)"
+            return "http://[::1]:\(p)"
         }
     }
 
@@ -144,7 +144,7 @@ public actor MockServer {
     /// ```swift
     /// let server = MockServer()
     /// try await server.start()
-    /// print(await server.baseURL) // "http://localhost:54321"
+    /// print(await server.baseURL) // "http://[::1]:54321"
     /// ```
     ///
     /// - Throws: ``MockServerError/alreadyRunning`` if the server is already started.
@@ -610,10 +610,10 @@ extension MockServer {
     /// ```swift
     /// let server = MockServer()
     /// let baseURL = try await server.startAndGetURL()
-    /// // baseURL = "http://localhost:54321"
+    /// // baseURL = "http://[::1]:54321"
     /// ```
     ///
-    /// - Returns: The server's base URL (e.g., `"http://localhost:54321"`).
+    /// - Returns: The server's base URL (e.g., `"http://[::1]:54321"`).
     /// - Throws: ``MockServerError/alreadyRunning`` or ``MockServerError/bindFailed(_:)``.
     public func startAndGetURL() async throws -> String {
         try await start()

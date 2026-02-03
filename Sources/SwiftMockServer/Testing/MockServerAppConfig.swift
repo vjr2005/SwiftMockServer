@@ -25,7 +25,7 @@ import Foundation
 ///
 /// These keys match the defaults in ``MockServerDetector``.
 public struct MockServerAppConfig: Sendable {
-    /// The base URL of the mock server (e.g., `"http://localhost:12345"`).
+    /// The base URL of the mock server (e.g., `"http://[::1]:12345"`).
     public let baseURL: String
 
     /// The port the mock server is listening on.
