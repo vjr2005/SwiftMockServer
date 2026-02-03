@@ -130,17 +130,17 @@ struct MockServerIntegrationTests {
     @Test("Parallel servers don't interfere with each other")
     func parallelServersIsolated() async throws {
         // Simulate parallel testing: multiple servers running simultaneously
-        let servers = try await withThrowingTaskGroup(of: (MockServer, UInt16).self) { group in
+        let servers = try await withThrowingTaskGroup(of: (MockServer, UInt16, Int).self) { group in
             for i in 0..<5 {
                 group.addTask {
                     let server = try await MockServer.create()
                     await server.stubJSON(.GET, "/api/id", json: "{\"id\": \(i)}")
                     let port = await server.port
-                    return (server, port)
+                    return (server, port, i)
                 }
             }
 
-            var results: [(MockServer, UInt16)] = []
+            var results: [(MockServer, UInt16, Int)] = []
             for try await result in group {
                 results.append(result)
             }
@@ -148,18 +148,18 @@ struct MockServerIntegrationTests {
         }
 
         // Verify each server responds with its own data
-        for (server, port) in servers {
+        for (_, port, expectedID) in servers {
             let url = try #require(URL(string: "http://[::1]:\(port)/api/id"))
             let (data, response) = try await makeSession().data(from: url)
             let httpResponse = try #require(response as? HTTPURLResponse)
             #expect(httpResponse.statusCode == 200)
 
             let body = try JSONDecoder().decode([String: Int].self, from: data)
-            #expect(body["id"] != nil)
+            #expect(body["id"] == expectedID)
         }
 
         // Clean up
-        for (server, _) in servers {
+        for (server, _, _) in servers {
             await server.stop()
         }
     }

@@ -34,6 +34,7 @@ actor SocketListener {
     private var acceptSource: DispatchSourceRead?
     private let assignedPort: UInt16
     private let acceptQueue: DispatchQueue
+    private let connectionTracker = ConnectionTracker()
 
     /// The port this listener is bound to.
     var port: UInt16 { assignedPort }
@@ -101,7 +102,9 @@ actor SocketListener {
         }
 
         isListening = true
+        connectionTracker.reset()
         let fd = serverFD
+        let tracker = connectionTracker
 
         // DispatchSource fires when the server socket has pending connections.
         // No thread blocks on accept() — GCD notifies us via kqueue.
@@ -122,7 +125,7 @@ actor SocketListener {
                     break // EWOULDBLOCK — no more pending connections
                 }
 
-                ConnectionDispatcher.handle(clientFD: clientFD, using: handler)
+                ConnectionDispatcher.handle(clientFD: clientFD, using: handler, tracker: tracker)
             }
         }
         source.setCancelHandler { /* fd is closed in stop() */ }
@@ -136,6 +139,7 @@ actor SocketListener {
             source.cancel()
             acceptSource = nil
         }
+        connectionTracker.cancelAll()
         if serverFD >= 0 {
             close(serverFD)
             serverFD = -1
@@ -145,6 +149,7 @@ actor SocketListener {
 
     deinit {
         acceptSource?.cancel()
+        connectionTracker.cancelAll()
         if serverFD >= 0 {
             close(serverFD)
         }
@@ -157,7 +162,7 @@ actor SocketListener {
 /// Completely event-driven — no thread is ever blocked.
 enum ConnectionDispatcher: Sendable {
 
-    static func handle(clientFD: Int32, using handler: @escaping ConnectionHandler) {
+    static func handle(clientFD: Int32, using handler: @escaping ConnectionHandler, tracker: ConnectionTracker) {
         // Set a short read timeout as safety net (localhost data arrives in <1ms)
         var timeout = timeval(tv_sec: 2, tv_usec: 0)
         setsockopt(clientFD, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
@@ -169,6 +174,13 @@ enum ConnectionDispatcher: Sendable {
         let ioQueue = DispatchQueue(label: "MockServer.io.\(clientFD)")
 
         let source = DispatchSource.makeReadSource(fileDescriptor: clientFD, queue: ioQueue)
+
+        // Register with the tracker; if already cancelled, close and bail
+        guard let connectionID = tracker.register(clientFD: clientFD, readSource: source) else {
+            Self.closeConnection(clientFD)
+            return
+        }
+
         // Use nonisolated(unsafe) for the mutable state managed by the serial ioQueue
         nonisolated(unsafe) var buffer = Data()
         nonisolated(unsafe) var readSource: DispatchSourceRead? = source
@@ -180,6 +192,7 @@ enum ConnectionDispatcher: Sendable {
                 // Connection closed or error — clean up
                 readSource?.cancel()
                 readSource = nil
+                guard tracker.deregister(connectionID) else { return }
                 Self.closeConnection(clientFD)
                 return
             }
@@ -195,18 +208,20 @@ enum ConnectionDispatcher: Sendable {
             readSource?.cancel()
             readSource = nil
 
-            Task {
+            let task = Task {
                 let response = await handler(request)
                 let responseData = HTTPParser.serialize(response)
                 ioQueue.async {
+                    guard tracker.deregister(connectionID) else { return }
                     Self.writeAll(to: clientFD, data: responseData)
                     Self.closeConnection(clientFD)
                 }
             }
+            tracker.setTask(task, for: connectionID)
         }
 
         source.setCancelHandler {
-            // No-op: clientFD is closed explicitly after writing
+            // No-op: clientFD is closed explicitly after writing or by cancelAll()
         }
 
         source.resume()
