@@ -61,24 +61,32 @@ done
 # Assemble XCFramework
 # ─────────────────────────────────────────────
 
-echo "▸ Creating XCFramework…"
+echo "▸ Creating static libraries…"
 
-FRAMEWORK_ARGS=()
+LIBRARY_ARGS=()
 for i in "${!LABELS[@]}"; do
     label="${LABELS[$i]}"
-    framework_path=$(find "${DERIVED_DATA}/${label}" -name "${FRAMEWORK_NAME}.framework" -type d | head -1)
-    if [ -z "${framework_path}" ]; then
-        echo "error: framework not found for ${label}" >&2
-        echo "Build contents:" >&2
-        find "${DERIVED_DATA}/${label}/Build/Products" -maxdepth 4 >&2 || true
+    products_dir=$(find "${DERIVED_DATA}/${label}/Build/Products" -type d -name "Release*" | head -1)
+    object_file="${products_dir}/${FRAMEWORK_NAME}.o"
+    static_lib="${products_dir}/lib${FRAMEWORK_NAME}.a"
+
+    if [ ! -f "${object_file}" ]; then
+        echo "error: ${FRAMEWORK_NAME}.o not found for ${label}" >&2
+        echo "Products contents:" >&2
+        find "${products_dir}" -maxdepth 3 >&2 || true
         exit 1
     fi
-    echo "  ${label}: ${framework_path}"
-    FRAMEWORK_ARGS+=(-framework "${framework_path}")
+
+    # Convert .o to .a so -create-xcframework -library can use it
+    libtool -static -o "${static_lib}" "${object_file}"
+    echo "  ${label}: ${static_lib}"
+    LIBRARY_ARGS+=(-library "${static_lib}" -headers "${products_dir}/${FRAMEWORK_NAME}.swiftmodule")
 done
 
+echo "▸ Creating XCFramework…"
+
 xcodebuild -create-xcframework \
-    "${FRAMEWORK_ARGS[@]}" \
+    "${LIBRARY_ARGS[@]}" \
     -output "${XCFRAMEWORK_PATH}"
 
 # ─────────────────────────────────────────────
