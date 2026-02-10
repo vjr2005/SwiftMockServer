@@ -24,7 +24,7 @@ import PackageDescription
 // Replace PLACEHOLDER with the real checksum after running `make xcframework`.
 // The binary target is excluded from resolution until the checksum is set,
 // so `swift build` and `swift test` keep working during development.
-let binaryChecksum = "PLACEHOLDER"
+let binaryChecksum = "7a13e0b67766c4133c6ac3c8907e1c44af6d8821802858c32ad7ba88d2403823"
 
 var products: [Product] = [
     .library(
