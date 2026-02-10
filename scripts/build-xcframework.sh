@@ -8,28 +8,11 @@ set -euo pipefail
 SCHEME="SwiftMockServer"
 FRAMEWORK_NAME="SwiftMockServer"
 BUILD_DIR="$(pwd)/build"
-ARCHIVES_DIR="${BUILD_DIR}/archives"
+DERIVED_DATA="${BUILD_DIR}/deriveddata"
 XCFRAMEWORK_PATH="${BUILD_DIR}/${FRAMEWORK_NAME}.xcframework"
 ZIP_PATH="${BUILD_DIR}/${FRAMEWORK_NAME}.xcframework.zip"
 
-COMMON_FLAGS=(
-    -scheme "${SCHEME}"
-    -configuration Release
-    BUILD_LIBRARY_FOR_DISTRIBUTION=YES
-    SKIP_INSTALL=NO
-    SWIFT_SERIALIZE_DEBUGGING_OPTIONS=NO
-)
-
-# Parallel arrays: sdk and its matching destination (bash 3.2 compatible)
-SDKS=(
-    iphoneos
-    iphonesimulator
-    macosx
-    appletvos
-    appletvsimulator
-    watchos
-    watchsimulator
-)
+# Parallel arrays: destination and the products subfolder (bash 3.2 compatible)
 DESTINATIONS=(
     "generic/platform=iOS"
     "generic/platform=iOS Simulator"
@@ -39,6 +22,15 @@ DESTINATIONS=(
     "generic/platform=watchOS"
     "generic/platform=watchOS Simulator"
 )
+LABELS=(
+    iphoneos
+    iphonesimulator
+    macosx
+    appletvos
+    appletvsimulator
+    watchos
+    watchsimulator
+)
 
 # ─────────────────────────────────────────────
 # Clean previous build
@@ -46,22 +38,22 @@ DESTINATIONS=(
 
 echo "▸ Cleaning previous build artifacts…"
 rm -rf "${BUILD_DIR}"
-mkdir -p "${ARCHIVES_DIR}"
 
 # ─────────────────────────────────────────────
-# Archive each platform
+# Build each platform
 # ─────────────────────────────────────────────
 
-for i in "${!SDKS[@]}"; do
-    sdk="${SDKS[$i]}"
+for i in "${!DESTINATIONS[@]}"; do
     destination="${DESTINATIONS[$i]}"
-    archive_path="${ARCHIVES_DIR}/${FRAMEWORK_NAME}-${sdk}.xcarchive"
-    echo "▸ Archiving ${sdk}…"
-    xcodebuild archive \
-        "${COMMON_FLAGS[@]}" \
-        -sdk "${sdk}" \
+    label="${LABELS[$i]}"
+    echo "▸ Building ${label}…"
+    xcodebuild build \
+        -scheme "${SCHEME}" \
+        -configuration Release \
         -destination "${destination}" \
-        -archivePath "${archive_path}" \
+        -derivedDataPath "${DERIVED_DATA}/${label}" \
+        BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+        SWIFT_SERIALIZE_DEBUGGING_OPTIONS=NO \
         -quiet
 done
 
@@ -72,15 +64,16 @@ done
 echo "▸ Creating XCFramework…"
 
 FRAMEWORK_ARGS=()
-for sdk in "${SDKS[@]}"; do
-    archive_path="${ARCHIVES_DIR}/${FRAMEWORK_NAME}-${sdk}.xcarchive"
-    framework_path=$(find "${archive_path}" -name "${FRAMEWORK_NAME}.framework" -type d | head -1)
+for i in "${!LABELS[@]}"; do
+    label="${LABELS[$i]}"
+    framework_path=$(find "${DERIVED_DATA}/${label}" -name "${FRAMEWORK_NAME}.framework" -type d | head -1)
     if [ -z "${framework_path}" ]; then
-        echo "error: framework not found in ${archive_path}" >&2
-        echo "Archive contents:" >&2
-        find "${archive_path}" -maxdepth 5 >&2
+        echo "error: framework not found for ${label}" >&2
+        echo "Build contents:" >&2
+        find "${DERIVED_DATA}/${label}/Build/Products" -maxdepth 4 >&2 || true
         exit 1
     fi
+    echo "  ${label}: ${framework_path}"
     FRAMEWORK_ARGS+=(-framework "${framework_path}")
 done
 
