@@ -119,6 +119,43 @@ public enum HTTPParser: Sendable {
         return (path, queryParameters)
     }
 
+    /// Check whether `data` contains a complete HTTP request.
+    ///
+    /// Returns `false` if the header terminator (`\r\n\r\n`) has not arrived yet,
+    /// or if a `Content-Length` header is present and the body received so far
+    /// is shorter than declared. For requests without `Content-Length` (e.g. GET),
+    /// the request is considered complete once all headers have arrived.
+    static func hasCompleteRequest(_ data: Data) -> Bool {
+        // Look for the header/body separator
+        let separator: [UInt8] = [0x0D, 0x0A, 0x0D, 0x0A] // \r\n\r\n
+        guard let separatorRange = data.range(of: Data(separator)) else {
+            return false
+        }
+
+        // Extract header bytes and look for Content-Length (case-insensitive)
+        let headerData = data[data.startIndex..<separatorRange.lowerBound]
+        guard let headerString = String(data: headerData, encoding: .utf8) else {
+            return false
+        }
+
+        let lines = headerString.components(separatedBy: "\r\n")
+        for line in lines {
+            let parts = line.split(separator: ":", maxSplits: 1)
+            guard parts.count == 2 else { continue }
+            if parts[0].trimmingCharacters(in: .whitespaces).lowercased() == "content-length" {
+                guard let declared = Int(parts[1].trimmingCharacters(in: .whitespaces)) else {
+                    return false
+                }
+                let bodyStart = separatorRange.upperBound
+                let bodyLength = data.count - data.distance(from: data.startIndex, to: bodyStart)
+                return bodyLength >= declared
+            }
+        }
+
+        // No Content-Length header → request is complete once headers are done
+        return true
+    }
+
     /// Serialize a ``MockHTTPResponse`` into raw HTTP/1.1 data for sending over the wire.
     ///
     /// Automatically adds `Content-Length`, `Connection: close`, and `Server` headers

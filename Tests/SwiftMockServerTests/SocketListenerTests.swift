@@ -121,6 +121,41 @@ struct SocketListenerTests {
         await server.stop()
     }
 
+    @Test("Handles POST with body sent in a separate chunk")
+    func postBodyInSeparateChunk() async throws {
+        let server = try await MockServer.create()
+        let port = await server.port
+
+        await server.register(.POST, "/upload") { request in
+            let echo = request.bodyString ?? ""
+            return .text(echo)
+        }
+
+        let fd = Self.connectTo(port: port)
+
+        // Send headers first (without the body)
+        let body = #"{"key":"value"}"#
+        let headers = "POST /upload HTTP/1.1\r\nHost: localhost\r\nContent-Length: \(body.count)\r\n\r\n"
+        _ = headers.withCString { send(fd, $0, strlen($0), 0) }
+
+        // Delay before sending the body — simulates slow CI network segments
+        try await Task.sleep(for: .milliseconds(200))
+
+        // Now send the body
+        _ = body.withCString { send(fd, $0, strlen($0), 0) }
+
+        // Read the response
+        try await Task.sleep(for: .milliseconds(200))
+        var buf = [UInt8](repeating: 0, count: 4096)
+        let n = recv(fd, &buf, buf.count, 0)
+        close(fd)
+
+        let response = n > 0 ? String(bytes: buf[..<n], encoding: .utf8) : nil
+        #expect(response?.contains(body) == true)
+
+        await server.stop()
+    }
+
     @Test("Listen fails on closed socket")
     func listenFailsOnClosedSocket() async throws {
         let listener = try SocketListener(port: 0)

@@ -200,7 +200,8 @@ enum ConnectionDispatcher: Sendable {
             buffer.append(chunk)
 
             // Try to parse — if we have a complete request, process it
-            guard let request = try? HTTPParser.parse(buffer) else {
+            guard HTTPParser.hasCompleteRequest(buffer),
+                  let request = try? HTTPParser.parse(buffer) else {
                 return // Wait for more data
             }
 
@@ -263,12 +264,15 @@ enum ConnectionDispatcher: Sendable {
         }
     }
 
-    /// Close a client connection.
-    /// Uses SO_LINGER with zero timeout to send RST instead of FIN,
-    /// preventing TIME_WAIT accumulation on the loopback interface.
+    /// Close a client connection gracefully.
+    /// Half-closes the write side (FIN after all buffered data is sent),
+    /// drains any remaining client data, then closes the socket.
     private static func closeConnection(_ fd: Int32) {
-        var ling = linger(l_onoff: 1, l_linger: 0)
-        setsockopt(fd, SOL_SOCKET, SO_LINGER, &ling, socklen_t(MemoryLayout<linger>.size))
+        // Half-close write side: sends FIN *after* all pending data is delivered.
+        shutdown(fd, SHUT_WR)
+        // Drain pending client data so TCP completes the handshake cleanly.
+        var drain = [UInt8](repeating: 0, count: 512)
+        while recv(fd, &drain, drain.count, 0) > 0 {}
         close(fd)
     }
 }

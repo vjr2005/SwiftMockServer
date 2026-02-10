@@ -100,6 +100,34 @@ struct HTTPParserTests {
         #expect(request.queryParameters["key"] == "val")
     }
 
+    // MARK: - hasCompleteRequest
+
+    @Test("hasCompleteRequest returns false when headers are incomplete")
+    func hasCompleteRequestIncompleteHeaders() {
+        let data = Data("GET /path HTTP/1.1\r\nHost: localhost\r\n".utf8)
+        #expect(HTTPParser.hasCompleteRequest(data) == false)
+    }
+
+    @Test("hasCompleteRequest returns false for POST with incomplete body")
+    func hasCompleteRequestIncompleteBody() {
+        let body = String(repeating: "x", count: 50)
+        let raw = "POST /data HTTP/1.1\r\nContent-Length: 100\r\n\r\n\(body)"
+        #expect(HTTPParser.hasCompleteRequest(Data(raw.utf8)) == false)
+    }
+
+    @Test("hasCompleteRequest returns true for POST with complete body")
+    func hasCompleteRequestCompleteBody() {
+        let body = String(repeating: "x", count: 100)
+        let raw = "POST /data HTTP/1.1\r\nContent-Length: 100\r\n\r\n\(body)"
+        #expect(HTTPParser.hasCompleteRequest(Data(raw.utf8)) == true)
+    }
+
+    @Test("hasCompleteRequest returns true for GET without Content-Length")
+    func hasCompleteRequestGET() {
+        let raw = "GET /path HTTP/1.1\r\nHost: localhost\r\n\r\n"
+        #expect(HTTPParser.hasCompleteRequest(Data(raw.utf8)) == true)
+    }
+
     @Test("Serializes response correctly")
     func serializeResponse() throws {
         let response = MockHTTPResponse.json("{\"ok\":true}")
