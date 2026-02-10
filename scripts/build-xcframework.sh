@@ -74,7 +74,11 @@ echo "▸ Creating XCFramework…"
 FRAMEWORK_ARGS=()
 for sdk in "${SDKS[@]}"; do
     archive_path="${ARCHIVES_DIR}/${FRAMEWORK_NAME}-${sdk}.xcarchive"
-    framework_path="${archive_path}/Products/usr/local/lib/${FRAMEWORK_NAME}.framework"
+    framework_path=$(find "${archive_path}" -name "${FRAMEWORK_NAME}.framework" -type d | head -1)
+    if [ -z "${framework_path}" ]; then
+        echo "error: framework not found in ${archive_path}" >&2
+        exit 1
+    fi
     FRAMEWORK_ARGS+=(-framework "${framework_path}")
 done
 
