@@ -77,6 +77,8 @@ for sdk in "${SDKS[@]}"; do
     framework_path=$(find "${archive_path}" -name "${FRAMEWORK_NAME}.framework" -type d | head -1)
     if [ -z "${framework_path}" ]; then
         echo "error: framework not found in ${archive_path}" >&2
+        echo "Archive contents:" >&2
+        find "${archive_path}" -maxdepth 5 >&2
         exit 1
     fi
     FRAMEWORK_ARGS+=(-framework "${framework_path}")
