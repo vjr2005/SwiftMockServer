@@ -1,4 +1,4 @@
-.PHONY: bootstrap setup generate edit build test clean graph spm-build spm-test help
+.PHONY: bootstrap setup generate edit build test clean graph spm-build spm-test xcframework help
 
 # ─────────────────────────────────────────────
 # Bootstrap (first time)
@@ -54,6 +54,14 @@ spm-test:
 	swift test
 
 # ─────────────────────────────────────────────
+# XCFramework
+# ─────────────────────────────────────────────
+
+## Build XCFramework for binary distribution
+xcframework:
+	@./scripts/build-xcframework.sh
+
+# ─────────────────────────────────────────────
 # Help
 # ─────────────────────────────────────────────
 
@@ -71,8 +79,9 @@ help:
 	@echo "  make test      → Run the tests"
 	@echo "  make clean     → Clean generated artifacts"
 	@echo "  make graph     → Display dependency graph"
-	@echo "  make spm-build → Build with SPM directly"
-	@echo "  make spm-test  → Test with SPM directly"
+	@echo "  make spm-build    → Build with SPM directly"
+	@echo "  make spm-test     → Test with SPM directly"
+	@echo "  make xcframework  → Build XCFramework for binary distribution"
 	@echo ""
 	@echo "  You can also use mise directly:"
 	@echo "    mise run setup / generate / build / test / clean / graph"

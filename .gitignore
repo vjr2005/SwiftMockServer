@@ -17,6 +17,9 @@ xcuserdata/
 
 # Swift Package Manager
 .build/
+
+# XCFramework build output
+build/
 .swiftpm/
 Package.resolved
 

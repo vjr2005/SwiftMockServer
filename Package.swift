@@ -21,6 +21,47 @@ import PackageDescription
     )
 #endif
 
+// Replace PLACEHOLDER with the real checksum after running `make xcframework`.
+// The binary target is excluded from resolution until the checksum is set,
+// so `swift build` and `swift test` keep working during development.
+let binaryChecksum = "PLACEHOLDER"
+
+var products: [Product] = [
+    .library(
+        name: "SwiftMockServer",
+        targets: ["SwiftMockServer"]
+    ),
+]
+
+var targets: [Target] = [
+    .target(
+        name: "SwiftMockServer",
+        swiftSettings: [
+            .enableUpcomingFeature("StrictConcurrency"),
+        ]
+    ),
+    .testTarget(
+        name: "SwiftMockServerTests",
+        dependencies: ["SwiftMockServer"]
+    ),
+]
+
+if binaryChecksum != "PLACEHOLDER" {
+    products.append(
+        .library(
+            name: "SwiftMockServerBinary",
+            targets: ["SwiftMockServerBinary"]
+        )
+    )
+    targets.append(
+        .binaryTarget(
+            name: "SwiftMockServerBinary",
+            url: "https://github.com/vjr2005/SwiftMockServer/releases/download/1.1.0/SwiftMockServer.xcframework.zip",
+            checksum: binaryChecksum
+        )
+    )
+}
+
 let package = Package(
     name: "SwiftMockServer",
     platforms: [
@@ -29,22 +70,6 @@ let package = Package(
         .tvOS(.v16),
         .watchOS(.v9),
     ],
-    products: [
-        .library(
-            name: "SwiftMockServer",
-            targets: ["SwiftMockServer"]
-        ),
-    ],
-    targets: [
-        .target(
-            name: "SwiftMockServer",
-            swiftSettings: [
-                .enableUpcomingFeature("StrictConcurrency"),
-            ]
-        ),
-        .testTarget(
-            name: "SwiftMockServerTests",
-            dependencies: ["SwiftMockServer"]
-        ),
-    ]
+    products: products,
+    targets: targets
 )

@@ -26,12 +26,14 @@ Most HTTP mocking libraries for Swift intercept requests at the `URLProtocol` le
 
 ## Installation
 
+### Option A: Source (default)
+
 Add SwiftMockServer to your project using Swift Package Manager:
 
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/vjr2005/SwiftMockServer.git", from: "1.0.0")
+    .package(url: "https://github.com/vjr2005/SwiftMockServer.git", from: "1.1.0")
 ]
 ```
 
@@ -43,6 +45,26 @@ Then add it to your test target:
     dependencies: ["SwiftMockServer"]
 )
 ```
+
+### Option B: Pre-compiled binary (XCFramework)
+
+For faster builds, use the pre-compiled XCFramework instead:
+
+```swift
+// Package.swift
+dependencies: [
+    .package(url: "https://github.com/vjr2005/SwiftMockServer.git", from: "1.1.0")
+]
+```
+
+```swift
+.testTarget(
+    name: "MyAppTests",
+    dependencies: ["SwiftMockServerBinary"]
+)
+```
+
+Both options use `import SwiftMockServer` — the API is identical.
 
 ## Quick Start
 
