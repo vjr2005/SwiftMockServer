@@ -20,14 +20,24 @@ COMMON_FLAGS=(
     SWIFT_SERIALIZE_DEBUGGING_OPTIONS=NO
 )
 
-PLATFORMS=(
-    "iphoneos"
-    "iphonesimulator"
-    "macosx"
-    "appletvos"
-    "appletvsimulator"
-    "watchos"
-    "watchsimulator"
+# Parallel arrays: sdk and its matching destination (bash 3.2 compatible)
+SDKS=(
+    iphoneos
+    iphonesimulator
+    macosx
+    appletvos
+    appletvsimulator
+    watchos
+    watchsimulator
+)
+DESTINATIONS=(
+    "generic/platform=iOS"
+    "generic/platform=iOS Simulator"
+    "generic/platform=macOS"
+    "generic/platform=tvOS"
+    "generic/platform=tvOS Simulator"
+    "generic/platform=watchOS"
+    "generic/platform=watchOS Simulator"
 )
 
 # ─────────────────────────────────────────────
@@ -42,12 +52,15 @@ mkdir -p "${ARCHIVES_DIR}"
 # Archive each platform
 # ─────────────────────────────────────────────
 
-for sdk in "${PLATFORMS[@]}"; do
+for i in "${!SDKS[@]}"; do
+    sdk="${SDKS[$i]}"
+    destination="${DESTINATIONS[$i]}"
     archive_path="${ARCHIVES_DIR}/${FRAMEWORK_NAME}-${sdk}.xcarchive"
     echo "▸ Archiving ${sdk}…"
     xcodebuild archive \
         "${COMMON_FLAGS[@]}" \
         -sdk "${sdk}" \
+        -destination "${destination}" \
         -archivePath "${archive_path}" \
         -quiet
 done
@@ -59,7 +72,7 @@ done
 echo "▸ Creating XCFramework…"
 
 FRAMEWORK_ARGS=()
-for sdk in "${PLATFORMS[@]}"; do
+for sdk in "${SDKS[@]}"; do
     archive_path="${ARCHIVES_DIR}/${FRAMEWORK_NAME}-${sdk}.xcarchive"
     framework_path="${archive_path}/Products/usr/local/lib/${FRAMEWORK_NAME}.framework"
     FRAMEWORK_ARGS+=(-framework "${framework_path}")
