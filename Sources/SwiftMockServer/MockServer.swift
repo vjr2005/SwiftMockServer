@@ -579,23 +579,27 @@ public actor MockServer {
     private func resolveResponse(for request: MockHTTPRequest) async -> MockHTTPResponse {
         let match = RouterEngine.match(request: request, routes: routes)
 
-        recordedRequests.append(RecordedRequest(
-            request: request,
-            matchedRoute: match?.route.pattern.description
-        ))
-
+        let response: MockHTTPResponse
         if let match {
             do {
-                return try await match.route.handler(request)
+                response = try await match.route.handler(request)
             } catch {
-                return MockHTTPResponse.text(
+                response = MockHTTPResponse.text(
                     "Handler Error: \(error)",
                     status: .internalServerError
                 )
             }
         } else {
-            return defaultResponse
+            response = defaultResponse
         }
+
+        recordedRequests.append(RecordedRequest(
+            request: request,
+            response: response,
+            matchedRoute: match?.route.pattern.description
+        ))
+
+        return response
     }
 }
 

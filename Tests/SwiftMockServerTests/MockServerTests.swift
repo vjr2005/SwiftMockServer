@@ -399,6 +399,29 @@ struct MockServerIntegrationTests {
         await server.stop()
     }
 
+    @Test("Recorded request includes the response")
+    func recordedRequestIncludesResponse() async throws {
+        let server = try await MockServer.create()
+        let port = await server.port
+
+        await server.stubJSON(.GET, "/api/greeting", json: #"{"hello":"world"}"#, status: .created)
+
+        let url = try #require(URL(string: "http://[::1]:\(port)/api/greeting"))
+        _ = try await makeSession().data(from: url)
+
+        let recorded = try await server.waitForRequest(
+            method: .GET,
+            path: "/api/greeting",
+            timeout: .seconds(2)
+        )
+
+        #expect(recorded.response.status == .created)
+        let body = try #require(recorded.response.body)
+        #expect(String(data: body, encoding: .utf8) == #"{"hello":"world"}"#)
+
+        await server.stop()
+    }
+
     @Test("startAndGetURL returns base URL")
     func startAndGetURLWorks() async throws {
         let server = MockServer()

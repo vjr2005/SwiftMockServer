@@ -21,6 +21,9 @@ public struct RecordedRequest: Sendable {
     /// The parsed HTTP request.
     public let request: MockHTTPRequest
 
+    /// The response that was sent back to the client.
+    public let response: MockHTTPResponse
+
     /// When the request was received.
     public let timestamp: Date
 
@@ -34,10 +37,12 @@ public struct RecordedRequest: Sendable {
     ///
     /// - Parameters:
     ///   - request: The parsed HTTP request.
+    ///   - response: The response that was returned.
     ///   - timestamp: When the request was received. Defaults to now.
     ///   - matchedRoute: Description of the matched route, or `nil`.
-    public init(request: MockHTTPRequest, timestamp: Date = Date(), matchedRoute: String? = nil) {
+    public init(request: MockHTTPRequest, response: MockHTTPResponse, timestamp: Date = Date(), matchedRoute: String? = nil) {
         self.request = request
+        self.response = response
         self.timestamp = timestamp
         self.matchedRoute = matchedRoute
     }
