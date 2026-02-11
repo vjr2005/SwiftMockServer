@@ -24,7 +24,7 @@ import PackageDescription
 // Replace PLACEHOLDER with the real checksum after running `make xcframework`.
 // The binary target is excluded from resolution until the checksum is set,
 // so `swift build` and `swift test` keep working during development.
-let binaryChecksum = "7a13e0b67766c4133c6ac3c8907e1c44af6d8821802858c32ad7ba88d2403823"
+let binaryChecksum = "aa73e7874822aaa55742947bd6d2606072e0066700d42735dbd6494e19b36b89"
 
 var products: [Product] = [
     .library(
@@ -56,7 +56,7 @@ if binaryChecksum != "PLACEHOLDER" {
     targets.append(
         .binaryTarget(
             name: "SwiftMockServerBinary",
-            url: "https://github.com/vjr2005/SwiftMockServer/releases/download/1.1.0/SwiftMockServer.xcframework.zip",
+            url: "https://github.com/vjr2005/SwiftMockServer/releases/download/1.1.1/SwiftMockServer.xcframework.zip",
             checksum: binaryChecksum
         )
     )
